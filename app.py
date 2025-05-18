@@ -12,8 +12,18 @@ from lead_selector import select_leads
 import gspread
 from google.oauth2.service_account import Credentials
 
+from flask_cors import CORS
+
 load_dotenv()
 app = Flask(__name__)
+
+# TODO: Change this in prod once nehes isreal gives their fucking domain 
+CORS(app, origins="*")
+
+# CORS(app, origins=[
+#     "http://localhost:3000",
+#     "https://the-actual-domain.com"
+# ])
 
 ACCOUNT_SID = os.getenv('ACCOUNT_SID')
 AUTH_TOKEN = os.getenv('AUTH_TOKEN')
