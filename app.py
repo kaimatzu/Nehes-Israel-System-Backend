@@ -182,5 +182,19 @@ def twilio_callback():
     update_sheet_status(call_sid, call_status, duration, from_number, to_number)
     return ("", 204)
 
+@app.route("/call_history", methods=["GET"])
+def get_call_history():
+    gc = gspread_client()
+    sh = gc.open_by_key(GOOGLE_SHEET_ID)
+    sheet = sh.worksheet("call_history")
+    records = sheet.get_all_records()
+    # Ensure duration is always an int (if present)
+    for rec in records:
+        if "duration" in rec and isinstance(rec["duration"], str) and rec["duration"].isdigit():
+            rec["duration"] = int(rec["duration"])
+        elif "duration" in rec and rec["duration"] == "":
+            rec["duration"] = 0
+    return jsonify(records)
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
