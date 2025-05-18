@@ -4,7 +4,7 @@ import base64
 from flask import Flask, request, Response, jsonify
 from dotenv import load_dotenv
 
-from twilio.twiml.voice_response import VoiceResponse, Dial
+from twilio.twiml.voice_response import VoiceResponse, Dial, Number
 from twilio.rest import Client
 
 from lead_selector import select_leads
@@ -106,11 +106,22 @@ def update_sheet_status(call_sid, status, duration=None, agent_number="", custom
 
 @app.route("/triple_call", methods=['GET', 'POST'])
 def triple_call_twiml():
-    leads = select_leads()
+    leads = select_leads()  # This should return a list of phone numbers as strings
     vr = VoiceResponse()
     dial = Dial()
+
+    callback_url = request.url_root.rstrip("/") + "/twilio_callback"
+    status_events = "initiated,ringing,answered,completed,busy,failed,no-answer,canceled"
+
     for n in leads:
-        dial.number(n)
+        num = Number(
+            n,
+            status_callback=callback_url,
+            status_callback_event=status_events,
+            status_callback_method="POST"
+        )
+        dial.append(num)
+
     vr.append(dial)
     return Response(str(vr), mimetype="text/xml")
 
@@ -128,9 +139,9 @@ def trigger_triple_call():
         from_=TWILIO_NUMBER,
         url=twiml_url,
         method="POST",
-        status_callback=callback_url,
-        status_callback_event=["initiated","ringing","answered","completed","busy","failed","no-answer","canceled"],
-        status_callback_method="POST"
+        # status_callback=callback_url,
+        # status_callback_event=["initiated","ringing","answered","completed","busy","failed","no-answer","canceled"],
+        # status_callback_method="POST"
     )
     return jsonify({"call_sid": call.sid})
 
@@ -147,9 +158,17 @@ def target_call_twiml():
         return Response("<Response><Say>No numbers provided</Say></Response>", mimetype="text/xml")
     vr = VoiceResponse()
     dial = Dial()
+    callback_url = request.url_root.rstrip("/") + "/twilio_callback"
     for n in numbers:
-        dial.number(n)
+        num = Number(
+            n,
+            status_callback=callback_url,
+            status_callback_event="initiated ringing answered completed busy failed no-answer canceled",
+            status_callback_method="POST"
+        )
+        dial.append(num)
     vr.append(dial)
+    print("Returning TwiML:", str(vr))
     return Response(str(vr), mimetype="text/xml")
 
 @app.route("/trigger_target_call", methods=['POST'])
@@ -168,9 +187,9 @@ def trigger_target_call():
         from_=TWILIO_NUMBER,
         url=twiml_url,
         method="POST",
-        status_callback=callback_url,
-        status_callback_event=["initiated","ringing","answered","completed","busy","failed","no-answer","canceled"],
-        status_callback_method="POST"
+        # status_callback=callback_url,
+        # status_callback_event=["initiated","ringing","answered","completed","busy","failed","no-answer","canceled"],
+        # status_callback_method="POST"
     )
     return jsonify({"call_sid": call.sid, "numbers": numbers})
 
@@ -204,7 +223,8 @@ def get_call_history():
             rec["duration"] = int(rec["duration"])
         elif "duration" in rec and rec["duration"] == "":
             rec["duration"] = 0
-    return jsonify(records)
+    # Reverse so latest calls (bottom rows) come first
+    return jsonify(records[::-1])
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
